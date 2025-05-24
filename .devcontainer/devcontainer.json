@@ -1,0 +1,45 @@
+{
+  "name": "Python 3.13",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/azure-cli:1": {
+      "extensions": "ml"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-azuretools.vscode-containers",
+        "ms-python.python",
+        "ms-toolsai.jupyter",
+        "ms-python.black-formatter",
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
+        "vsls-contrib.gitdoc",
+        "ms-vscode.azurecli",
+        "vsls-contrib.gitdoc",
+        "esbenp.prettier-vscode",
+        "oderwat.indent-rainbow",
+        "wayou.vscode-todo-highlight",
+        "sleistner.vscode-fileutils",
+        "vscode-icons-team.vscode-icons"
+      ]
+    },
+    "settings": {
+      "terminal.integrated.defaultProfile.linux": "bash",
+      "editor.formatOnSave": true,
+      "editor.defaultFormatter": "esbenp.prettier-vscode",
+      "workbench.iconTheme": "vscode-icons",
+      "todohighlight.keywords": [
+        {
+          "text": "FEATURE:",
+          "color": "white",
+          "backgroundColor": "#68ba7f"
+        }
+      ]
+    }
+  }
+}
