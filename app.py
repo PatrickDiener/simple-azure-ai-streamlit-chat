@@ -208,7 +208,7 @@ def main():
                 stream = client.complete(
                     messages=messages,
                     model=selected_model,
-                    max_tokens=1000,
+                    # remove entirely, was, max_completion_tokens=1000, changed from older max_tokens
                     stream=True
                 )
 
