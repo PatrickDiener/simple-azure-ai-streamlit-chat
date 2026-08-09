@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+import requests, json
 import json
 import streamlit as st
 from azure.ai.inference import ChatCompletionsClient
@@ -13,6 +14,44 @@ endpoint = os.getenv("AZURE_INFERENCE_SDK_ENDPOINT")
 key = os.getenv("AZURE_INFERENCE_SDK_KEY")
 client = ChatCompletionsClient(
     endpoint=endpoint, credential=AzureKeyCredential(key))
+
+# import security_api  # Import AIRS API module
+# Load AIRS URL and API Key
+url = os.getenv("AIRS_API_URL")
+api_key = os.getenv("AIRS_API_KEY")
+airs_profile_name = os.getenv("AIRS_PROFILE_NAME") 
+
+# Check that environment variables are actually populated
+if not all([url, api_key, airs_profile_name]):
+    raise ValueError("Missing one or more required environment variables (AIRS_API_URL, AIRS_API_KEY, AIRS_PROFILE_NAME)")
+
+
+def makeRequest(prompt):
+    url = os.getenv("AIRS_API_URL")
+    api_key = os.getenv("AIRS_API_KEY")
+    profile_name = os.getenv("AIRS_PROFILE_NAME")
+
+    headers = {
+        "x-pan-token": api_key
+    }
+    data = {
+        "ai_profile": {
+            "profile_name": profile_name
+        },
+        "metadata": {
+            "app_user": "AnyWeb-Sample-Chat",
+            "ai_model": "gpt-5-mini"
+        },
+        "contents": [
+            {
+                "prompt": prompt
+            }
+        ]
+    }
+
+    response = requests.post(url, headers=headers, json=data)
+    return response.json()
+
 
 # Pre-configured system prompt templates for different assistant personalities
 SYSTEM_PROMPT_TEMPLATES = {
@@ -56,7 +95,7 @@ def safe_json(obj):
 
 def main():
     """Main entry point for the Streamlit chat application."""
-    st.title("Chat with me! 🤖")
+    st.title("AnyChat by AnyWeb 🤖")
 
     # List available models for user selection
     available_models = get_available_models()
@@ -128,6 +167,22 @@ def main():
                 img_bytes = file.read()
                 img_b64 = base64.b64encode(img_bytes).decode("utf-8")
                 images_b64.append(img_b64)
+
+        # Security check
+        security_response = makeRequest(prompt.text)
+        if security_response["action"] == "block":
+            block_reasons = []
+            for key, value in security_response.items():
+                if isinstance(value, dict):
+                    for sub_key, sub_value in value.items():
+                        if sub_value is True:
+                            block_reasons.append(sub_key.capitalize())
+                elif value is True and key != "action":
+                    block_reasons.append(key.capitalize())
+
+            st.error(f"Prompt blocked by Palo Alto Prisma AIRS API due to: {', '.join(block_reasons)}")
+            return
+        
         # Add user message (and images) to chat history
         st.session_state.chat_history.append(
             {
