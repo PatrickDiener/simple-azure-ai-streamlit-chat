@@ -26,7 +26,7 @@ if not all([url, api_key, airs_profile_name]):
     raise ValueError("Missing one or more required environment variables (AIRS_API_URL, AIRS_API_KEY, AIRS_PROFILE_NAME)")
 
 
-def makeRequest(prompt):
+def makeRequest(prompt=None, response_text=None):
     url = os.getenv("AIRS_API_URL")
     api_key = os.getenv("AIRS_API_KEY")
     profile_name = os.getenv("AIRS_PROFILE_NAME")
@@ -34,6 +34,13 @@ def makeRequest(prompt):
     headers = {
         "x-pan-token": api_key
     }
+    
+    content_item = {}
+    if prompt is not None:
+        content_item["prompt"] = prompt
+    if response_text is not None:
+        content_item["response"] = response_text
+
     data = {
         "ai_profile": {
             "profile_name": profile_name
@@ -42,11 +49,7 @@ def makeRequest(prompt):
             "app_user": "AnyWeb-Sample-Chat",
             "ai_model": "gpt-5-mini"
         },
-        "contents": [
-            {
-                "prompt": prompt
-            }
-        ]
+        "contents": [content_item]
     }
 
     response = requests.post(url, headers=headers, json=data)
@@ -114,6 +117,20 @@ def main():
         height=300,
     )
 
+    # Toggle to turn on/off displaying AIRS verdicts for prompts
+    show_prompt_verdicts = st.sidebar.toggle(
+        "Display AIRS verdicts for prompts",
+        value=True,
+        key="show_prompt_verdicts"
+    )
+
+    # Toggle to turn on/off displaying AIRS verdicts for responses
+    show_airs_verdicts = st.sidebar.toggle(
+        "Display AIRS verdicts for responses",
+        value=True,
+        key="show_airs_verdicts"
+    )
+
     # Toggle display of session state for debugging
     if "show_session_state" not in st.session_state:
         st.session_state.show_session_state = False
@@ -156,6 +173,22 @@ def main():
                     with st.popover("View full image", icon="🔍"):
                         st.image(img)
 
+            # Display AIRS response verdict for assistant messages if enabled
+            if message["role"] == "assistant" and "airs_verdict" in message and show_airs_verdicts:
+                verdict = message["airs_verdict"]
+                action = verdict.get("action", "unknown").upper()
+                category = verdict.get("category", "unknown")
+                with st.expander(f"🛡️ AIRS Response Verdict: {action} ({category})", expanded=False):
+                    st.json(verdict)
+
+            # Display AIRS prompt verdict for user messages if enabled
+            if message["role"] == "user" and "airs_verdict" in message and show_prompt_verdicts:
+                verdict = message["airs_verdict"]
+                action = verdict.get("action", "unknown").upper()
+                category = verdict.get("category", "unknown")
+                with st.expander(f"🛡️ AIRS Prompt Verdict: {action} ({category})", expanded=False):
+                    st.json(verdict)
+
     # Handle user input (text and optional images)
     if prompt := st.chat_input("Say something and/or attach an image", accept_file=True):
         images_b64 = []
@@ -171,16 +204,11 @@ def main():
         # Security check
         security_response = makeRequest(prompt.text)
         if security_response["action"] == "block":
-            block_reasons = []
-            for key, value in security_response.items():
-                if isinstance(value, dict):
-                    for sub_key, sub_value in value.items():
-                        if sub_value is True:
-                            block_reasons.append(sub_key.capitalize())
-                elif value is True and key != "action":
-                    block_reasons.append(key.capitalize())
-
-            st.error(f"Prompt blocked by Palo Alto Prisma AIRS API due to: {', '.join(block_reasons)}")
+            if show_prompt_verdicts:
+                action = security_response.get("action", "unknown").upper()
+                category = security_response.get("category", "unknown")
+                with st.expander(f"🛡️ AIRS Prompt Verdict: {action} ({category})", expanded=False):
+                    st.json(security_response)
             return
         
         # Add user message (and images) to chat history
@@ -188,7 +216,8 @@ def main():
             {
                 "role": "user",
                 "content": prompt.text,
-                "images_b64": images_b64 if images_b64 else None
+                "images_b64": images_b64 if images_b64 else None,
+                "airs_verdict": security_response
             }
         )
         with st.chat_message("user"):
@@ -204,6 +233,13 @@ def main():
                     st.image(img, width=200)
                     with st.popover("View full image", icon="🔍"):
                         st.image(img)
+                        
+            # Display AIRS prompt verdict for the newly submitted user message if enabled
+            if show_prompt_verdicts:
+                action = security_response.get("action", "unknown").upper()
+                category = security_response.get("category", "unknown")
+                with st.expander(f"🛡️ AIRS Prompt Verdict: {action} ({category})", expanded=False):
+                    st.json(security_response)
 
         # Generate assistant response and display it
         with st.chat_message("assistant"):
@@ -269,8 +305,53 @@ def main():
 
                 response = st.write_stream(text_stream())
 
+                # Post-generation security check on response
+                security_response = makeRequest(response_text=response)
+                
+                if security_response.get("action") == "block":
+                    block_reasons = []
+                    for key, value in security_response.items():
+                        if isinstance(value, dict):
+                            for sub_key, sub_value in value.items():
+                                if sub_value is True:
+                                    block_reasons.append(sub_key.capitalize())
+                        elif value is True and key != "action":
+                            block_reasons.append(key.capitalize())
+
+                    st.error(f"Response blocked by Palo Alto Prisma AIRS API due to: {', '.join(block_reasons)}")
+                    
+                    if show_airs_verdicts:
+                        action = security_response.get("action", "unknown").upper()
+                        category = security_response.get("category", "unknown")
+                        with st.expander(f"🛡️ AIRS Response Verdict: {action} ({category})", expanded=False):
+                            st.json(security_response)
+                            
+                    st.session_state.chat_history.append(
+                        {
+                            "role": "assistant",
+                            "content": "⚠️ Response blocked by Palo Alto Prisma AIRS API.",
+                            "airs_verdict": security_response
+                        }
+                    )
+                    st.rerun()
+                else:
+                    st.session_state.chat_history.append(
+                        {
+                            "role": "assistant",
+                            "content": response,
+                            "airs_verdict": security_response
+                        }
+                    )
+                    if show_airs_verdicts:
+                        action = security_response.get("action", "unknown").upper()
+                        category = security_response.get("category", "unknown")
+                        with st.expander(f"🛡️ AIRS Response Verdict: {action} ({category})", expanded=False):
+                            st.json(security_response)
+
             # Error handling for API and network issues
             except Exception as e:
+                if type(e).__name__ in ("RerunException", "StopException"):
+                    raise e
                 from azure.core.exceptions import HttpResponseError
                 if isinstance(e, HttpResponseError):
                     # Try to extract error details from the response object
@@ -297,9 +378,11 @@ def main():
                 else:
                     st.error(f"An error occurred: {e}")
                     response = "An error occurred."
-        # Add assistant response to chat history
-        st.session_state.chat_history.append(
-            {"role": "assistant", "content": response})
+                
+                # Append error message to chat history
+                st.session_state.chat_history.append(
+                    {"role": "assistant", "content": response}
+                )
 
 
 if __name__ == "__main__":
