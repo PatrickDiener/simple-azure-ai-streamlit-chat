@@ -10,13 +10,13 @@ This template provides a secure, interactive web-based chat experience. It integ
 
 ### Features
 
-- **Azure AI Inference Integration**: Seamlessly switch between preconfigured AI models (e.g. `gpt-5-mini`) via a dropdown menu.
-- **System Prompt Templates**: Choose from preconfigured personalities (Funny Cowboy, Technical, etc.) or write your own custom system instructions.
-- **Multimodal Support**: Supports uploading images alongside text prompts.
+- **AnyWeb AI Assistant**: Customized system prompt tailored for visitors and customers inquiring about AnyWeb (www.anyweb.ch) services and products (Enterprise Networking, Cybersecurity, Cloud, Automation, and Consulting).
+- **Azure AI Inference Integration**: Powered by state-of-the-art Azure AI Foundry models.
+- **Multimodal & File Support**: Supports uploading images and attaching text files (`.txt`, `.log`, `.md`, `.json`, etc.) alongside chat prompts.
 - **Palo Alto Networks AIRS Security Checks**:
-  - **Prompt Scanning**: Every user prompt is scanned before being forwarded to Azure AI. Unsafe prompts are blocked safely without contacting the LLM.
-  - **Response Scanning**: Every AI-generated response is scanned upon completion. If a response violates security policy, it is intercepted, blocked, and replaced with a secure warning.
-- **Security Verdict Toggles**: Dedicated sidebar toggles allow users to easily display or hide detailed AIRS security scan JSON payloads directly below prompts and responses in the chat window.
+  - **Prompt Scanning**: Every user prompt and text attachment is scanned before being forwarded to Azure AI. Unsafe prompts are blocked safely without contacting the LLM.
+  - **Response Scanning**: Every AI-generated response can be scanned upon completion. If a response violates security policy, it is intercepted, blocked, and replaced with a secure warning.
+- **Granular Security Controls**: Dedicated sidebar toggles to turn AIRS scanning on/off and inspect detailed security scan JSON payloads directly below prompts and responses.
 - **Chat History Management**: Clear or view full session state at any time via sidebar controls.
 
 ---
@@ -67,8 +67,10 @@ AIRS_PROFILE_NAME=<your-airs-security-profile-name>
 
 ## 🛡️ Security Inspection Controls
 
-The sidebar includes two toggles for auditing security verdicts:
-- **Display AIRS verdicts for prompts**: Toggles display of the prompt security audit report.
-- **Display AIRS verdicts for responses**: Toggles display of the response security audit report.
+The sidebar includes intuitive toggles for scanning and auditing security verdicts:
+- **Enable AIRS scanning**: Master toggle to turn Palo Alto AIRS scanning on or off for all chat interactions.
+  - **Enable response scanning**: (Available when AIRS is enabled) Selectively turn AI response scanning on or off.
+  - **Display AIRS verdicts for prompts**: Toggles display of the prompt security audit report.
+  - **Display AIRS verdicts for responses**: (Available when response scanning is enabled) Toggles display of the response security audit report.
 
-When turned on, an expander box labeled `🛡️ AIRS Prompt Verdict` or `🛡️ AIRS Response Verdict` will appear below the respective chat messages, rendering the raw JSON verdict containing details such as toxicity levels, policy actions, and risk categories.
+When verdict display is turned on, an expander box labeled `🛡️ AIRS Prompt Verdict` or `🛡️ AIRS Response Verdict` will appear below the respective chat messages, rendering the raw JSON verdict containing details such as toxicity levels, policy actions, and risk categories.
