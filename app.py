@@ -173,6 +173,12 @@ def main():
                     with st.popover("View full image", icon="🔍"):
                         st.image(img)
 
+            # Display attached text files as expanders
+            if "text_files" in message and message["text_files"]:
+                for tf in message["text_files"]:
+                    with st.expander(f"📄 Attached File: {tf['name']}", expanded=False):
+                        st.text(tf["content"])
+
             # Display AIRS response verdict for assistant messages if enabled
             if message["role"] == "assistant" and "airs_verdict" in message and show_airs_verdicts:
                 verdict = message["airs_verdict"]
@@ -189,20 +195,29 @@ def main():
                 with st.expander(f"🛡️ AIRS Prompt Verdict: {action} ({category})", expanded=False):
                     st.json(verdict)
 
-    # Handle user input (text and optional images)
-    if prompt := st.chat_input("Say something and/or attach an image", accept_file=True):
+    # Handle user input (text, optional images, and optional text files)
+    if prompt := st.chat_input("Say something, attach an image, or upload a text file", accept_file=True):
         images_b64 = []
-        # Convert uploaded images to base64 for storage and API use
+        text_files = []
+        full_text = prompt.text
+
+        # Convert uploaded images to base64 and read text file contents
         if getattr(prompt, "files", None):
             import base64
             for file in prompt.files:
                 file.seek(0)
-                img_bytes = file.read()
-                img_b64 = base64.b64encode(img_bytes).decode("utf-8")
-                images_b64.append(img_b64)
+                name_lower = file.name.lower()
+                if name_lower.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp")):
+                    img_bytes = file.read()
+                    img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+                    images_b64.append(img_b64)
+                elif name_lower.endswith((".txt", ".log", ".md", ".json", ".csv", ".xml", ".yaml", ".yml")):
+                    content_str = file.read().decode("utf-8", errors="replace")
+                    text_files.append({"name": file.name, "content": content_str})
+                    full_text += f"\n\n--- Attachment: {file.name} ---\n{content_str}\n-----------------------"
 
-        # Security check
-        security_response = makeRequest(prompt.text)
+        # Security check on combined text
+        security_response = makeRequest(full_text)
         if security_response["action"] == "block":
             if show_prompt_verdicts:
                 action = security_response.get("action", "unknown").upper()
@@ -211,12 +226,14 @@ def main():
                     st.json(security_response)
             return
         
-        # Add user message (and images) to chat history
+        # Add user message (and images/text files) to chat history
         st.session_state.chat_history.append(
             {
                 "role": "user",
                 "content": prompt.text,
+                "full_content": full_text,
                 "images_b64": images_b64 if images_b64 else None,
+                "text_files": text_files if text_files else None,
                 "airs_verdict": security_response
             }
         )
@@ -233,6 +250,12 @@ def main():
                     st.image(img, width=200)
                     with st.popover("View full image", icon="🔍"):
                         st.image(img)
+
+            # Display attached text files as expanders
+            if text_files:
+                for tf in text_files:
+                    with st.expander(f"📄 Attached File: {tf['name']}", expanded=False):
+                        st.text(tf["content"])
                         
             # Display AIRS prompt verdict for the newly submitted user message if enabled
             if show_prompt_verdicts:
@@ -262,14 +285,14 @@ def main():
                                         },
                                         {
                                             "type": "text",
-                                            "text": m["content"]
+                                            "text": m.get("full_content", m["content"])
                                         }
                                     ]
                                 }
                             )
                     else:
                         messages.append(
-                            {"role": m["role"], "content": m["content"]}
+                            {"role": m["role"], "content": m.get("full_content", m["content"])}
                         )
 
                 # Insert system prompt as the first message if provided
