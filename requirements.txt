@@ -1,5 +1,6 @@
 requests
-dotenv
+python-dotenv
 streamlit
-azure.identity
+Pillow
+azure-identity
 azure-ai-inference
